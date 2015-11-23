@@ -92,3 +92,4 @@ class RhiziAPIClient(object):
         payload = { "rzdoc_name" : rzdoc_name, "topo_diff" : topo_diff}
 
         r = self.make_request("POST", "rzdoc/diff-commit__topo", data=payload)
+        return r
