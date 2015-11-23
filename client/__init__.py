@@ -44,9 +44,11 @@ class RhiziAPIClient(object):
             r = self.session.post(req_url, json=data)
 
             # handle 403 error
+            log.debug( "%s : %s", r.status_code, r.text)
             if r.status_code == 403 :
                 log.error("403 Unauthorized request")
                 raise ValueError("403 Unauthorized request")
+
             return r
 
     def user_register(email_address, first_name, last_name, pw_plaintxt, rz_username):
@@ -72,7 +74,7 @@ class RhiziAPIClient(object):
         log.debug("sucessfully logged in with user : %s", email_address)
         return r.json()
 
-    def create_node(self, rzdoc_name, name, id=str(random.getrandbits(32)), labels=[]):
+    def create_node(self, rzdoc_name, name, id=str(random.getrandbits(32)), labels=["Type"]):
         assert type(labels) is list
         assert type(id) is str
         assert type(name) is str
@@ -82,7 +84,7 @@ class RhiziAPIClient(object):
         node =  {}
         node["name"] = name
         node["id"] = id
-        node["__label_set"] = []
+        node["__label_set"] = labels
 
         # parse JSON data
         topo_diff = { "node_set_add" : [ node ]  }
