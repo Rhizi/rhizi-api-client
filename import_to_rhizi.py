@@ -4,6 +4,7 @@
 import os, csv
 import argparse
 from client import RhiziAPIClient
+from client import set_debugging
 
 def parse_data(filename):
     """Parse CSV data from file"""
@@ -21,17 +22,18 @@ if __name__ == '__main__':
     parser.add_argument('filename', action="store", default=None, help='CSV file path' )
     parser.add_argument('--base-url', default='http://localhost:8080', help='Base URL for the API')
     parser.add_argument('--user', default=None, help='Username')
-    parser.add_argument('--password', default=None, help='pasword' )
+    parser.add_argument('--password', default=None, help='Password' )
+    parser.add_argument('--rz-doc-name', default="Welcome to Rhizi", help='Name of the document to update' )
+    parser.add_argument('--verbose', default=False, help='Show / hide logs' )
 
     args = parser.parse_args()
 
+    # verbose mode
+    if args.verbose is not False: set_debugging()
+
     # init Client API
     print args.base_url
-    client = RhiziAPIClient(args.base_url)
-
-    # log user in
-    client.user_login(args.user, args.password)
-    print client,
+    client = RhiziAPIClient(args.base_url, args.user, args.password)
 
     #check if the file exists
     if not os.path.isfile(args.filename) : raise ValueError("File '%s' doesn't exist"%args.filename)
@@ -39,9 +41,9 @@ if __name__ == '__main__':
     # parse data
     data = parse_data(args.filename)
 
-
-
     # update nodes
+    client.create_node(args.rz_doc_name, "Muttons")
+
     # for row in data :
     #     params = dict(
     #         data={ "count" : row["count"] }
