@@ -38,19 +38,19 @@ class RhiziAPIClient(object):
 
         # make API url
         req_url = self.make_url(path)
+        log.debug( "%s API call : %s", method, req_url)
 
         if method == "POST":
-            log.debug( "%s API call : %s", method, req_url)
-            # send request
             r = self.session.post(req_url, json=data)
+        elif method == "DELETE":
+            r = self.session.delete(req_url, json=data)
 
-            # handle 403 error
-            log.debug( "%s : %s", r.status_code, r.text)
-            if r.status_code == 403 :
-                log.error("403 Unauthorized request")
-                raise ValueError("403 Unauthorized request")
+        log.debug( "%s : %s", r.status_code, r.text)
 
-            return r
+        if r.status_code == 403 : # handle 403 error
+            log.error("403 Unauthorized request")
+            raise ValueError("403 Unauthorized request")
+        return r
 
     def user_register(self, email_address, pw_plaintxt, rz_username, first_name, last_name):
         """POST register a new user"""
@@ -74,6 +74,27 @@ class RhiziAPIClient(object):
         assert r.status_code == 201
         log.debug("sucessfully logged in with user : %s", email_address)
         return r.json()
+
+    def create_rz_doc(self, doc_name):
+        """Create a new Rz-Doc"""
+        assert type(doc_name) is str
+        r = self.make_request("POST", 'rzdoc/' + doc_name + '/create', {})
+        log.debug("Creating new rz-doc : %s", doc_name)
+        return r
+
+    def delete_rz_doc(self, doc_name):
+        """Delete a new Rz-Doc"""
+        assert type(doc_name) is str
+        r = self.make_request("DELETE", 'rzdoc/' + doc_name + '/delete', {})
+        log.debug("Deleted Rz-doc : %s", doc_name)
+        return r
+
+    def search_rz_doc(self, doc_name):
+        """Search a Rz-Doc by name"""
+        assert type(doc_name) is str
+        r = self.make_request("POST", 'rzdoc/search', {'search_query' : doc_name})
+        log.debug("Search Rz-doc : %s", doc_name)
+        return r
 
     def create_node(self, rzdoc_name, name, id=str(random.getrandbits(32)), labels=["Type"]):
         assert type(labels) is list
