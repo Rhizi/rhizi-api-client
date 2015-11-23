@@ -29,11 +29,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # verbose mode
-    if args.verbose is not False: set_debugging()
+
 
     # init Client API
     print args.base_url
-    client = RhiziAPIClient(args.base_url, args.user, args.password)
+    client = RhiziAPIClient(args.base_url, args.user, args.password, debug=args.verbose)
 
     #check if the file exists
     if not os.path.isfile(args.filename) : raise ValueError("File '%s' doesn't exist"%args.filename)

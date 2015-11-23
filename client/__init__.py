@@ -10,9 +10,10 @@ def set_debugging():
 
 class RhiziAPIClient(object):
 
-    def __init__(self, base_url, email_address=None, password=None):
+    def __init__(self, base_url, email_address=None, password=None, debug=False):
         self.base_url = base_url
         self.session = requests.session()
+        if debug: set_debugging()
 
         log.debug("Init API at %s", base_url)
 
@@ -51,8 +52,9 @@ class RhiziAPIClient(object):
 
             return r
 
-    def user_register(email_address, first_name, last_name, pw_plaintxt, rz_username):
+    def user_register(self, email_address, pw_plaintxt, rz_username, first_name, last_name):
         """POST register a new user"""
+
         payload = {}
         payload["email_address"]=email_address
         payload["first_name"]=first_name
@@ -60,8 +62,7 @@ class RhiziAPIClient(object):
         payload["pw_plaintxt"]=pw_plaintxt
         payload["rz_username"]=rz_username
 
-        signup_url = make_url("signup")
-        print signup_url
+        signup_url = self.make_request("POST", "signup", payload)
 
     def user_login(self, email_address, password):
         """POST login user"""
