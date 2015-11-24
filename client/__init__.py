@@ -75,28 +75,28 @@ class RhiziAPIClient(object):
         log.debug("sucessfully logged in with user : %s", email_address)
         return r.json()
 
-    def create_rz_doc(self, doc_name):
+    def rz_doc_create(self, doc_name):
         """Create a new Rz-Doc"""
         assert type(doc_name) is str
         r = self.make_request("POST", 'rzdoc/' + doc_name + '/create', {})
         log.debug("Creating new rz-doc : %s", doc_name)
         return r
 
-    def delete_rz_doc(self, doc_name):
+    def rz_doc_delete(self, doc_name):
         """Delete a new Rz-Doc"""
         assert type(doc_name) is str
         r = self.make_request("DELETE", 'rzdoc/' + doc_name + '/delete', {})
         log.debug("Deleted Rz-doc : %s", doc_name)
         return r
 
-    def search_rz_doc(self, doc_name):
+    def rz_doc_search(self, doc_name):
         """Search a Rz-Doc by name"""
         assert type(doc_name) is str
         r = self.make_request("POST", 'rzdoc/search', {'search_query' : doc_name})
         log.debug("Search Rz-doc : %s", doc_name)
         return r
 
-    def create_node(self, rzdoc_name, name, id=str(random.getrandbits(32)), labels=["Type"]):
+    def node_create(self, rzdoc_name, name, id=str(random.getrandbits(32)), labels=["Type"]):
         assert type(labels) is list
         assert type(id) is str
         assert type(name) is str
@@ -113,4 +113,26 @@ class RhiziAPIClient(object):
         payload = { "rzdoc_name" : rzdoc_name, "topo_diff" : topo_diff}
 
         r = self.make_request("POST", "rzdoc/diff-commit__topo", data=payload)
+        return r
+
+    def node_delete(self, rzdoc_name, name):
+        raise NotImplementedError
+
+    def node_update_attr(self, rzdoc_name, node_id, attrs):
+        """Update attributes of a node"""
+        # check params
+        assert type(attrs) is dict
+        assert type(node_id) is str
+        assert type(rzdoc_name) is str
+
+        # parse data
+        attr_diff = {}
+        attr_diff["__type_node"] = {
+            node_id : {
+                "__attr_write"  : attrs,
+            }
+        }
+        payload = { "rzdoc_name" : rzdoc_name, "attr_diff" : attr_diff}
+
+        r = self.make_request("POST", "rzdoc/diff-commit__attr", data=payload)
         return r

@@ -3,7 +3,8 @@ from client import RhiziAPIClient, set_debugging
 
 class TestRhiziAPIClient(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(self):
 
         # constant
         self.rz_doc_name = "Test"
@@ -21,36 +22,46 @@ class TestRhiziAPIClient(unittest.TestCase):
         self.client.user_login(self.user_email, self.user_password)
 
         # clean DB and create a new Test rz doc
-        self.client.delete_rz_doc(self.rz_doc_name)
-        self.client.create_rz_doc(self.rz_doc_name)
+        self.client.rz_doc_delete(self.rz_doc_name)
+        self.client.rz_doc_create(self.rz_doc_name)
 
     def test_make_url(self):
         """URLs should be conformed, errors should be raised when passing wrong paths """
         self.assertRaises(ValueError, lambda : self.client.make_url("/start-with-slash") )
         self.assertRaises(ValueError, lambda : self.client.make_url("http://rhizi.com/api") )
 
-    def test_create_new_doc(self):
+    def test_rz_doc_create_delete_search(self):
         """API should allow creation and deleting of new documents"""
-        self.assertRaises(AssertionError, lambda : self.client.create_rz_doc(12) ) # wrong type
+        self.assertRaises(AssertionError, lambda : self.client.rz_doc_create(12) ) # wrong type
         doc_name = "New Test Doc"
-        r = self.client.create_rz_doc(doc_name)
+        r = self.client.rz_doc_create(doc_name)
         self.assertEqual(r.status_code, 201)
-        r= self.client.search_rz_doc(doc_name)
+        r= self.client.rz_doc_search(doc_name)
         self.assertEqual(r.status_code, 200)
         self.assertIn(doc_name, r.text)
-        r= self.client.delete_rz_doc(doc_name)
+        r= self.client.rz_doc_delete(doc_name)
         self.assertEqual(r.status_code, 204)
 
     def test_node_create(self):
         """API should allow node creation"""
-        self.assertRaises(AssertionError, lambda : self.client.create_node(12,"haha") )
-        self.assertRaises(AssertionError, lambda : self.client.create_node("12",12) )
+        self.assertRaises(AssertionError, lambda : self.client.node_create(12,"haha") )
+        self.assertRaises(AssertionError, lambda : self.client.node_create("12",12) )
 
         id = "ID-89388"
         name="My Test Node"
 
         # TODO : non-authorized should raise error
-        # self.assertRaises(ValueError, lambda : self.client.create_node("Test", name, id=id, labels=["Type"]) )
+        # self.assertRaises(ValueError, lambda : self.client.node_create("Test", name, id=id, labels=["Type"]) )
 
-        r = self.client.create_node(self.rz_doc_name, name, id=id, labels=["Type"])
+        r = self.client.node_create(self.rz_doc_name, name, id=id, labels=["Type"])
         self.assertEqual(r.status_code, 200)
+
+    def test_node_attr_update(self):
+
+        # create a node
+        id = "ID-1"
+        name="My Changing Node"
+        r = self.client.node_create(self.rz_doc_name, name, id=id, labels=["Type"])
+
+        # modify name
+        r = self.client.node_update_attr(self.rz_doc_name, id, {"name" : "My Awesome Node","description" : "Greatest node ever." })
