@@ -1,5 +1,5 @@
 import unittest
-from client import RhiziAPIClient, set_debugging
+from rhizi_client import RhiziAPIClient, set_debugging
 
 class TestRhiziAPIClient(unittest.TestCase):
 

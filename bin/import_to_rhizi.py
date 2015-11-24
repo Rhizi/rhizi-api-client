@@ -3,8 +3,7 @@
 
 import os, csv
 import argparse
-from client import RhiziAPIClient
-from client import set_debugging
+from rhizi_client import RhiziAPIClient, set_debugging
 
 def parse_data(filename):
     """Parse CSV data from file"""
