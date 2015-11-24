@@ -38,7 +38,7 @@ class RhiziAPIClient(object):
 
         # make API url
         req_url = self.make_url(path)
-        log.debug( "%s API call : %s", method, req_url)
+        log.debug( "%s API call : %s %s", method, req_url, str(data))
 
         if method == "POST":
             r = self.session.post(req_url, json=data)
@@ -96,7 +96,9 @@ class RhiziAPIClient(object):
         log.debug("Search Rz-doc : %s", doc_name)
         return r
 
-    def node_create(self, rzdoc_name, name, id=str(random.getrandbits(32)), labels=["Type"]):
+    def node_create_one(self, rzdoc_name, name, id=str(random.getrandbits(32)), labels=["Type"]):
+        """Create a single node"""
+
         assert type(labels) is list
         assert type(id) is str
         assert type(name) is str
@@ -110,6 +112,25 @@ class RhiziAPIClient(object):
 
         # parse JSON data
         topo_diff = { "node_set_add" : [ node ]  }
+        payload = { "rzdoc_name" : rzdoc_name, "topo_diff" : topo_diff}
+
+        r = self.make_request("POST", "rzdoc/diff-commit__topo", data=payload)
+        return r
+
+    def node_create(self, rzdoc_name, nodes):
+        """Create multiple nodes at once"""
+        # check params
+        assert type(rzdoc_name) is str
+        assert type(nodes) is list
+        for node in nodes:
+            assert type(node["label"]) is list
+            assert type(node["id"]) is str
+            assert type(node["name"]) is str
+            node["__label_set"] = node["label"]
+            del(node["label"])
+
+        # parse JSON data
+        topo_diff = { "node_set_add" : nodes  }
         payload = { "rzdoc_name" : rzdoc_name, "topo_diff" : topo_diff}
 
         r = self.make_request("POST", "rzdoc/diff-commit__topo", data=payload)
@@ -135,4 +156,27 @@ class RhiziAPIClient(object):
         payload = { "rzdoc_name" : rzdoc_name, "attr_diff" : attr_diff}
 
         r = self.make_request("POST", "rzdoc/diff-commit__attr", data=payload)
+        return r
+
+    def edge_create_one(self, rzdoc_name, nodeA_id, nodeB_id, id=str(random.getrandbits(32)), relationships=[]):
+        """Create an edge giving two existing nodes"""
+
+        # check params
+        assert type(rzdoc_name) is str
+        assert type(nodeA_id) is str
+        assert type(nodeB_id) is str
+        assert type(relationships) is list
+
+        # make link
+        link = {}
+        link["id"] = id
+        link["__dst_id"] = nodeA_id
+        link["__src_id"] = nodeB_id
+        link["__type"] = relationships
+
+        # payload
+        topo_diff = { "link_set_add" : [ link ]  }
+        payload = { "rzdoc_name" : rzdoc_name, "topo_diff" : topo_diff}
+
+        r = self.make_request("POST", "rzdoc/diff-commit__topo", data=payload)
         return r

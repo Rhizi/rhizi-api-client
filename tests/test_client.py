@@ -53,7 +53,11 @@ class TestRhiziAPIClient(unittest.TestCase):
         # TODO : non-authorized should raise error
         # self.assertRaises(ValueError, lambda : self.client.node_create("Test", name, id=id, labels=["Type"]) )
 
-        r = self.client.node_create(self.rz_doc_name, name, id=id, labels=["Type"])
+        r = self.client.node_create_one(self.rz_doc_name, name, id=id, labels=["Type"])
+        self.assertEqual(r.status_code, 200)
+
+        nodes = [{"name":"nodeA", "label": ["skill"], "id":"node_01"}, {"name":"nodeB", "label": ["keyword"], "id":"node_02"}]
+        r = self.client.node_create(self.rz_doc_name, nodes)
         self.assertEqual(r.status_code, 200)
 
     def test_node_attr_update(self):
@@ -61,7 +65,16 @@ class TestRhiziAPIClient(unittest.TestCase):
         # create a node
         id = "ID-1"
         name="My Changing Node"
-        r = self.client.node_create(self.rz_doc_name, name, id=id, labels=["Type"])
+        r = self.client.node_create_one(self.rz_doc_name, name, id=id, labels=["Type"])
 
         # modify name
         r = self.client.node_update_attr(self.rz_doc_name, id, {"name" : "My Awesome Node","description" : "Greatest node ever." })
+
+    def test_edge_create(self):
+
+        # create a node
+        nodes = [{"name":"nodeC", "label": ["idea"], "id":"node_03"}, {"name":"nodeD", "label": ["Skill"], "id":"node_04"}]
+        r = self.client.node_create(self.rz_doc_name, nodes)
+
+        self.client.edge_create_one(self.rz_doc_name, nodes[0]["id"], nodes[1]["id"], relationships=["loves"])
+        self.assertEqual(r.status_code, 200)
