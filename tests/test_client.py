@@ -105,7 +105,7 @@ class TestRhiziAPIClient(unittest.TestCase):
         ("node_06", "node_03", "hates")
         ]
 
-        edges = [ {"source" : e[0],"target" : e[1] , "relationships" : [e[2]], "options": {"option" : "test"} } for e in edges_data]
+        edges = [ {"__src_id" : e[0],"__dst_id" : e[1] , "__type" : [e[2]], "options": {"option" : "test"} } for e in edges_data]
 
         self.client.edge_create(self.rz_doc_name, edges)
         self.assertEqual(r.status_code, 200)
