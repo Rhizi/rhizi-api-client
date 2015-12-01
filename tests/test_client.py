@@ -1,5 +1,6 @@
 import unittest
 from rhizi_client import RhiziAPIClient, set_debugging
+import json
 
 class TestRhiziAPIClient(unittest.TestCase):
 
@@ -49,7 +50,8 @@ class TestRhiziAPIClient(unittest.TestCase):
         r_clone= self.client.rz_doc_clone(doc_name)
         self.assertEqual(r_clone.status_code, 200)
         resp = json.loads(r_clone.text)
-        self.assertIn(None, resp["error"])
+        # print resp
+        self.assertEqual(None, resp["error"])
 
         r= self.client.rz_doc_delete(doc_name)
         self.assertEqual(r.status_code, 204)
@@ -84,9 +86,26 @@ class TestRhiziAPIClient(unittest.TestCase):
 
     def test_edge_create(self):
 
-        # create a node
-        nodes = [{"name":"nodeC", "label": ["idea"], "id":"node_03"}, {"name":"nodeD", "label": ["Skill"], "id":"node_04"}]
+        nodes = [
+            {"name":"John", "label": ["Person"], "id":"node_03"},
+            {"name":"ELM coding", "label": ["Skill"], "id":"node_04"},
+            {"name":"Video Game", "label": ["Idea"], "id":"node_05"},
+            {"name":"Jacky", "label": ["Person"], "id":"node_06"},
+            ]
         r = self.client.node_create(self.rz_doc_name, nodes)
 
+        # create an edge
         self.client.edge_create_one(self.rz_doc_name, nodes[0]["id"], nodes[1]["id"], relationships=["loves"])
+        self.assertEqual(r.status_code, 200)
+
+        # multiple edges
+        edges_data = [("node_03", "node_04", "is learning"),
+        ("node_04", "node_05", "is used for"),
+        ("node_03", "node_06", "loves"),
+        ("node_06", "node_03", "hates")
+        ]
+
+        edges = [ {"source" : e[0],"target" : e[1] , "relationships" : [e[2]], "options": {"option" : "test"} } for e in edges_data]
+
+        self.client.edge_create(self.rz_doc_name, edges)
         self.assertEqual(r.status_code, 200)

@@ -187,3 +187,40 @@ class RhiziAPIClient(object):
 
         r = self.make_request("POST", "rzdoc/diff-commit__topo", data=payload)
         return r
+
+    def edge_create(self, rzdoc_name, edges):
+        """Create edges giving a list of dict {source:"", target:"", relationships:[], options:{}}"""
+
+        # check params
+        assert type(edges) is list
+        assert type(rzdoc_name) is str
+        for edge in edges:
+            assert type(edge) is dict
+            assert type(edge["source"]) is str
+            assert type(edge["target"]) is str
+            assert type(edge["relationships"]) is list
+            try :
+                assert type(edge["id"]) is str
+            except KeyError:
+                edge["id"]=str(random.getrandbits(32))
+            try :
+                assert type(edge["options"]) is dict
+            except KeyError:
+                edge["id"]={}
+
+        # make links
+        links=[]
+        for edge in edges:
+            link = {}
+            link["id"] = edge["id"]
+            link["__dst_id"] = edge["source"]
+            link["__src_id"] = edge["target"]
+            link["__type"] = edge["relationships"]
+            links.append(link)
+
+        # payload
+        topo_diff = { "link_set_add" : links   }
+        payload = { "rzdoc_name" : rzdoc_name, "topo_diff" : topo_diff}
+
+        r = self.make_request("POST", "rzdoc/diff-commit__topo", data=payload)
+        return r
