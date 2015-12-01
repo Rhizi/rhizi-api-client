@@ -33,12 +33,24 @@ class TestRhiziAPIClient(unittest.TestCase):
     def test_rz_doc_create_delete_search(self):
         """API should allow creation and deleting of new documents"""
         self.assertRaises(AssertionError, lambda : self.client.rz_doc_create(12) ) # wrong type
+
         doc_name = "New Test Doc"
+        r= self.client.rz_doc_delete(doc_name)
+
         r = self.client.rz_doc_create(doc_name)
         self.assertEqual(r.status_code, 201)
+
+        # search
         r= self.client.rz_doc_search(doc_name)
         self.assertEqual(r.status_code, 200)
         self.assertIn(doc_name, r.text)
+
+        # clone
+        r_clone= self.client.rz_doc_clone(doc_name)
+        self.assertEqual(r_clone.status_code, 200)
+        resp = json.loads(r_clone.text)
+        self.assertIn(None, resp["error"])
+
         r= self.client.rz_doc_delete(doc_name)
         self.assertEqual(r.status_code, 204)
 

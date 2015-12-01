@@ -85,7 +85,7 @@ class RhiziAPIClient(object):
     def rz_doc_clone(self, doc_name):
         """Clone an existing Rz-Doc"""
         assert type(doc_name) is str
-        r = self.make_request("POST", 'rzdoc/' + doc_name + '/clone', {})
+        r = self.make_request("POST", 'rzdoc/clone', {"rzdoc_name" : doc_name})
         log.debug("cloning existing rz-doc : %s", doc_name)
         return r
 
