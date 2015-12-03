@@ -210,3 +210,22 @@ class RhiziAPIClient(object):
 
         r = self.make_request("POST", "rzdoc/diff-commit__topo", data=payload)
         return r
+
+    def edge_update_attr(self, rzdoc_name, edge_id, attrs):
+        """Update attributes of an edge"""
+        # check params
+        assert type(attrs) is dict
+        assert type(node_id) is str
+        assert type(rzdoc_name) is str
+
+        # parse data
+        attr_diff = {}
+        attr_diff["__type_edge"] = {
+            edge_id : {
+                "__attr_write"  : attrs,
+            }
+        }
+        payload = { "rzdoc_name" : rzdoc_name, "attr_diff" : attr_diff}
+
+        r = self.make_request("POST", "rzdoc/diff-commit__attr", data=payload)
+        return r
