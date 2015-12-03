@@ -71,8 +71,7 @@ class RhiziAPIClient(object):
         payload["password"]=password
 
         r = self.make_request("POST", "login", data=payload)
-        print r.status_code
-        # assert r.status_code == 201
+        assert r.status_code == 200
         log.debug("sucessfully logged in with user : %s", email_address)
         return r.json()
 

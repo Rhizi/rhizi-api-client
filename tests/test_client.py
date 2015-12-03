@@ -21,7 +21,7 @@ class TestRhiziAPIClient(unittest.TestCase):
 
         # user login and store credentials
         self.client.user_login(self.user_email, self.user_password)
-
+        
         # clean DB and create a new Test rz doc
         self.client.rz_doc_delete(self.rz_doc_name)
         self.client.rz_doc_create(self.rz_doc_name)
