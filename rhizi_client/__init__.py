@@ -146,25 +146,6 @@ class RhiziAPIClient(object):
     def node_delete(self, rzdoc_name, name):
         raise NotImplementedError
 
-    def node_update_attr(self, rzdoc_name, node_id, attrs):
-        """Update attributes of a node"""
-        # check params
-        assert type(attrs) is dict
-        assert type(node_id) is str
-        assert type(rzdoc_name) is str
-
-        # parse data
-        attr_diff = {}
-        attr_diff["__type_node"] = {
-            node_id : {
-                "__attr_write"  : attrs,
-            }
-        }
-        payload = { "rzdoc_name" : rzdoc_name, "attr_diff" : attr_diff}
-
-        r = self.make_request("POST", "rzdoc/diff-commit__attr", data=payload)
-        return r
-
     def edge_create_one(self, rzdoc_name, nodeA_id, nodeB_id, id=str(random.getrandbits(32)), relationships=[]):
         """Create an edge giving two existing nodes"""
 
@@ -211,7 +192,8 @@ class RhiziAPIClient(object):
         r = self.make_request("POST", "rzdoc/diff-commit__topo", data=payload)
         return r
 
-    def edge_update_attr(self, rzdoc_name, edge_id, attrs):
+    # attributes
+    def edge_update_attr_single(self, rzdoc_name, edge_id, attrs):
         """Update attributes of an edge"""
         # check params
         assert type(attrs) is dict
@@ -227,5 +209,63 @@ class RhiziAPIClient(object):
         }
         payload = { "rzdoc_name" : rzdoc_name, "attr_diff" : attr_diff}
 
+        r = self.make_request("POST", "rzdoc/diff-commit__attr", data=payload)
+        return r
+
+    def edge_update_attr(self, rzdoc_name, edge_attrs):
+        """Update attributes of edges"""
+        # check params
+        assert type(rzdoc_name) is str
+        assert type(edge_attrs) is dict
+        for edge_id in edge_attrs :
+            assert type(edge_id) is str
+            assert type(edge_attrs[edge_id]) is dict
+
+        attrs = { id : { "__attr_write" : edge_attrs[id]} for id in edge_attrs }
+        print attrs
+
+        # parse data
+        attr_diff = {}
+        attr_diff["__type_edge"] = attrs
+
+        payload = { "rzdoc_name" : rzdoc_name, "attr_diff" : attr_diff}
+
+        r = self.make_request("POST", "rzdoc/diff-commit__attr", data=payload)
+        return r
+
+    def node_update_attr_single(self, rzdoc_name, node_id, attrs):
+        """Update attributes of a node"""
+        # check params
+        assert type(attrs) is dict
+        assert type(node_id) is str
+        assert type(rzdoc_name) is str
+
+        # parse data
+        attr_diff = {}
+        attr_diff["__type_node"] = {
+            node_id : {
+                "__attr_write"  : attrs,
+            }
+        }
+        payload = { "rzdoc_name" : rzdoc_name, "attr_diff" : attr_diff}
+
+        r = self.make_request("POST", "rzdoc/diff-commit__attr", data=payload)
+        return r
+
+    def node_update_attr(self, rzdoc_name, node_attrs):
+        """Update attributes of an edge"""
+        # check params
+        assert type(rzdoc_name) is str
+        for node_id in node_attrs :
+            assert type(node_id) is str
+            assert type(node_attrs[node_id]) is dict
+
+        # parse data
+        attrs = { id : { "__attr_write" : node_attrs[id]} for id in node_attrs }
+        print attrs
+
+        attr_diff = {}
+        attr_diff["__type_node"] = attrs
+        payload = { "rzdoc_name" : rzdoc_name, "attr_diff" : attr_diff}
         r = self.make_request("POST", "rzdoc/diff-commit__attr", data=payload)
         return r
