@@ -5,6 +5,7 @@ import logging
 logging.basicConfig()
 log = logging.getLogger('rhizi-client')
 
+
 def set_debugging():
     log.setLevel(logging.DEBUG)
 
@@ -13,7 +14,8 @@ class RhiziAPIClient(object):
     def __init__(self, base_url, email_address=None, password=None, debug=False):
         self.base_url = base_url
         self.session = requests.session()
-        if debug: set_debugging()
+        if debug:
+            set_debugging()
 
         log.debug("Init API at %s", base_url)
 
@@ -30,7 +32,7 @@ class RhiziAPIClient(object):
         elif path == "signup":
             return self.base_url + "/signup"
         else :
-            return self.base_url+"/api/"+path
+            return "{}/api/{}".format(self.base_url, path)
 
     def make_request(self, method, path, data):
         assert method in ["POST", "GET", "DELETE"]
@@ -183,7 +185,7 @@ class RhiziAPIClient(object):
             try :
                 assert type(edge["id"]) is str
             except KeyError:
-                edge["id"]=str(random.getrandbits(32))
+                edge["id"] = str(random.getrandbits(32))
 
         # payload
         topo_diff = { "link_set_add" : edges   }
@@ -222,7 +224,7 @@ class RhiziAPIClient(object):
             assert type(edge_attrs[edge_id]) is dict
 
         attrs = { id : { "__attr_write" : edge_attrs[id]} for id in edge_attrs }
-        print attrs
+        log.debug(attrs)
 
         # parse data
         attr_diff = {}
@@ -262,7 +264,7 @@ class RhiziAPIClient(object):
 
         # parse data
         attrs = { id : { "__attr_write" : node_attrs[id]} for id in node_attrs }
-        print attrs
+        log.debug(attrs)
 
         attr_diff = {}
         attr_diff["__type_node"] = attrs
