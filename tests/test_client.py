@@ -1,6 +1,12 @@
+import sys
 import unittest
-from rhizi_client import RhiziAPIClient, set_debugging
 import json
+from rhizi_client import RhiziAPIClient, set_debugging
+
+python2 = sys.version_info[0] == 2
+if not python2:
+    unicode = str
+
 
 class TestRhiziAPIClient(unittest.TestCase):
 
@@ -8,7 +14,7 @@ class TestRhiziAPIClient(unittest.TestCase):
     def setUpClass(self):
 
         # constant
-        self.rz_doc_name = "Test"
+        self.rz_doc_name = unicode("Test")
         self.user_email = "tester@test.com"
         self.user_password = "password"
 
@@ -21,7 +27,7 @@ class TestRhiziAPIClient(unittest.TestCase):
 
         # user login and store credentials
         self.client.user_login(self.user_email, self.user_password)
-        
+
         # clean DB and create a new Test rz doc
         self.client.rz_doc_delete(self.rz_doc_name)
         self.client.rz_doc_create(self.rz_doc_name)
@@ -35,7 +41,7 @@ class TestRhiziAPIClient(unittest.TestCase):
         """API should allow creation and deleting of new documents"""
         self.assertRaises(AssertionError, lambda : self.client.rz_doc_create(12) ) # wrong type
 
-        doc_name = "New Test Doc"
+        doc_name = unicode("New Test Doc")
         r= self.client.rz_doc_delete(doc_name)
 
         r = self.client.rz_doc_create(doc_name)
@@ -62,7 +68,7 @@ class TestRhiziAPIClient(unittest.TestCase):
         self.assertRaises(AssertionError, lambda : self.client.node_create("12",12) )
 
         id = "ID-89388"
-        name="My Test Node"
+        name = unicode("My Test Node")
 
         # TODO : non-authorized should raise error
         # self.assertRaises(ValueError, lambda : self.client.node_create("Test", name, id=id, labels=["Type"]) )
@@ -70,7 +76,12 @@ class TestRhiziAPIClient(unittest.TestCase):
         r = self.client.node_create_one(self.rz_doc_name, name, id=id, labels=["Type"])
         self.assertEqual(r.status_code, 200)
 
-        nodes = [{"name":"nodeA", "label": ["skill"], "id":"node_01"}, {"name":"nodeB", "label": ["keyword"], "id":"node_02"}]
+        nodes = [{"name": unicode("nodeA"),
+                  "label": ["skill"],
+                  "id":"node_01"},
+                 {"name": unicode("nodeB"),
+                  "label": ["keyword"],
+                  "id":"node_02"}]
         r = self.client.node_create(self.rz_doc_name, nodes)
         self.assertEqual(r.status_code, 200)
 
@@ -78,19 +89,21 @@ class TestRhiziAPIClient(unittest.TestCase):
 
         # create a node
         id = "ID-1"
-        name="My Changing Node"
+        name = unicode("My Changing Node")
         r = self.client.node_create_one(self.rz_doc_name, name, id=id, labels=["Type"])
 
         # modify name
-        r = self.client.node_update_attr(self.rz_doc_name, id, {"name" : "My Awesome Node","description" : "Greatest node ever." })
+        attrs = {"name" : "My Awesome Node",
+                 "description" : "Greatest node ever."}
+        r = self.client.node_update_attr_single(self.rz_doc_name, id, attrs)
 
     def test_edge_create(self):
 
         nodes = [
-            {"name":"John", "label": ["Person"], "id":"node_03"},
-            {"name":"ELM coding", "label": ["Skill"], "id":"node_04"},
-            {"name":"Video Game", "label": ["Idea"], "id":"node_05"},
-            {"name":"Jacky", "label": ["Person"], "id":"node_06"},
+            {"name": unicode("John"), "label": ["Person"], "id":"node_03"},
+            {"name": unicode("ELM coding"), "label": ["Skill"], "id":"node_04"},
+            {"name": unicode("Video Game"), "label": ["Idea"], "id":"node_05"},
+            {"name": unicode("Jacky"), "label": ["Person"], "id":"node_06"},
             ]
         r = self.client.node_create(self.rz_doc_name, nodes)
 

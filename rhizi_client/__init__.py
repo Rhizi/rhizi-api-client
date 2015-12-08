@@ -1,6 +1,8 @@
 import requests
 import random
 import logging
+import sys
+
 
 logging.basicConfig()
 log = logging.getLogger('rhizi-client')
@@ -8,6 +10,33 @@ log = logging.getLogger('rhizi-client')
 
 def set_debugging():
     log.setLevel(logging.DEBUG)
+
+python2 = sys.version_info[0] == 2
+
+
+if python2:
+    def string_to_unicode(s):
+        if isinstance(s, unicode):
+            return s
+        return s.decode('utf-8')
+else:
+    string_to_unicode = str
+    unicode = str
+
+
+# TODO - isn't this in urllib2 somewhere?
+if not python2:
+    bytes_ord = lambda x: x
+    bytes_chr = chr
+else:
+    bytes_ord = ord
+    bytes_chr = lambda x: x
+
+
+def urlescape(s):
+    b = string_to_unicode(s).encode('utf-8')
+    return ''.join('%{:02x}'.format(bytes_ord(x)) if bytes_ord(x) > 128 else bytes_chr(x) for x in b)
+
 
 class RhiziAPIClient(object):
 
@@ -26,6 +55,8 @@ class RhiziAPIClient(object):
     def make_url(self, path):
         if path[0] == "/" : raise ValueError("URL path should not start with /")
         if path[0:4] == "http" : raise ValueError("URL path should contains only path no http://'). Already : %s"%self.base_url)
+
+        path = urlescape(path)
 
         if path == "login" :
             return self.base_url + "/login"
@@ -79,30 +110,30 @@ class RhiziAPIClient(object):
 
     def rz_doc_create(self, doc_name):
         """Create a new Rz-Doc"""
-        assert type(doc_name) is str
-        r = self.make_request("POST", 'rzdoc/' + doc_name + '/create', {})
+        assert type(doc_name) is unicode
         log.debug("Creating new rz-doc : %s", doc_name)
+        r = self.make_request("POST", 'rzdoc/' + doc_name + '/create', {})
         return r
 
     def rz_doc_clone(self, doc_name):
         """Clone an existing Rz-Doc"""
-        assert type(doc_name) is str
-        r = self.make_request("POST", 'rzdoc/clone', {"rzdoc_name" : doc_name})
+        assert type(doc_name) is unicode
         log.debug("cloning existing rz-doc : %s", doc_name)
+        r = self.make_request("POST", 'rzdoc/clone', {"rzdoc_name" : doc_name})
         return r
 
     def rz_doc_delete(self, doc_name):
         """Delete a new Rz-Doc"""
-        assert type(doc_name) is str
+        assert type(doc_name) is unicode
         r = self.make_request("DELETE", 'rzdoc/' + doc_name + '/delete', {})
         log.debug("Deleted Rz-doc : %s", doc_name)
         return r
 
     def rz_doc_search(self, doc_name):
         """Search a Rz-Doc by name"""
-        assert type(doc_name) is str
-        r = self.make_request("POST", 'rzdoc/search', {'search_query' : doc_name})
+        assert type(doc_name) is unicode
         log.debug("Search Rz-doc : %s", doc_name)
+        r = self.make_request("POST", 'rzdoc/search', {'search_query' : doc_name})
         return r
 
     def node_create_one(self, rzdoc_name, name, id=str(random.getrandbits(32)), labels=["Type"]):
@@ -110,8 +141,8 @@ class RhiziAPIClient(object):
 
         assert type(labels) is list
         assert type(id) is str
-        assert type(name) is str
-        assert type(rzdoc_name) is str
+        assert type(name) is unicode
+        assert type(rzdoc_name) is unicode
 
         # create node object
         node =  {}
@@ -129,12 +160,12 @@ class RhiziAPIClient(object):
     def node_create(self, rzdoc_name, nodes):
         """Create multiple nodes at once"""
         # check params
-        assert type(rzdoc_name) is str
+        assert type(rzdoc_name) is unicode
         assert type(nodes) is list
         for node in nodes:
             assert type(node["label"]) is list
             assert type(node["id"]) is str
-            assert type(node["name"]) is str
+            assert type(node["name"]) is unicode
             node["__label_set"] = node["label"]
             del(node["label"])
 
@@ -152,7 +183,7 @@ class RhiziAPIClient(object):
         """Create an edge giving two existing nodes"""
 
         # check params
-        assert type(rzdoc_name) is str
+        assert type(rzdoc_name) is unicode
         assert type(nodeA_id) is str
         assert type(nodeB_id) is str
         assert type(relationships) is list
@@ -176,7 +207,7 @@ class RhiziAPIClient(object):
 
         # check params
         assert type(edges) is list
-        assert type(rzdoc_name) is str
+        assert type(rzdoc_name) is unicode
         for edge in edges:
             assert type(edge) is dict
             assert type(edge["__src_id"]) is str
@@ -200,11 +231,11 @@ class RhiziAPIClient(object):
         # check params
         assert type(attrs) is dict
         assert type(node_id) is str
-        assert type(rzdoc_name) is str
+        assert type(rzdoc_name) is unicode
 
         # parse data
         attr_diff = {}
-        attr_diff["__type_edge"] = {
+        attr_diff["__type_link"] = {
             edge_id : {
                 "__attr_write"  : attrs,
             }
@@ -217,7 +248,7 @@ class RhiziAPIClient(object):
     def edge_update_attr(self, rzdoc_name, edge_attrs):
         """Update attributes of edges"""
         # check params
-        assert type(rzdoc_name) is str
+        assert type(rzdoc_name) is unicode
         assert type(edge_attrs) is dict
         for edge_id in edge_attrs :
             assert type(edge_id) is str
@@ -228,7 +259,7 @@ class RhiziAPIClient(object):
 
         # parse data
         attr_diff = {}
-        attr_diff["__type_edge"] = attrs
+        attr_diff["__type_link"] = attrs
 
         payload = { "rzdoc_name" : rzdoc_name, "attr_diff" : attr_diff}
 
@@ -240,7 +271,7 @@ class RhiziAPIClient(object):
         # check params
         assert type(attrs) is dict
         assert type(node_id) is str
-        assert type(rzdoc_name) is str
+        assert type(rzdoc_name) is unicode
 
         # parse data
         attr_diff = {}
@@ -257,7 +288,7 @@ class RhiziAPIClient(object):
     def node_update_attr(self, rzdoc_name, node_attrs):
         """Update attributes of an edge"""
         # check params
-        assert type(rzdoc_name) is str
+        assert type(rzdoc_name) is unicode
         for node_id in node_attrs :
             assert type(node_id) is str
             assert type(node_attrs[node_id]) is dict
