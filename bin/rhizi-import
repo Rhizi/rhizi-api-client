@@ -5,17 +5,18 @@ import os, csv
 import argparse
 from rhizi_client import RhiziAPIClient, set_debugging
 
+
 def parse_data(filename):
     """Parse CSV data from file"""
     with open(filename, 'rb') as f:
         reader = csv.DictReader(f)
         data = [row for row in reader]
 
-    print "Data: %s rows to export"%len(data)
+    print("Data: {} rows to export".format(len(data)))
     return data
 
-if __name__ == '__main__':
 
+def main():
     # cli parser
     parser = argparse.ArgumentParser(description='Rhizi Importer with simples options')
     parser.add_argument('filename', action="store", default=None, help='CSV file path' )
@@ -35,7 +36,8 @@ if __name__ == '__main__':
     client = RhiziAPIClient(args.base_url, args.user, args.password, debug=args.verbose)
 
     #check if the file exists
-    if not os.path.isfile(args.filename) : raise ValueError("File '%s' doesn't exist"%args.filename)
+    if not os.path.isfile(args.filename):
+        raise ValueError("File '%s' doesn't exist"%args.filename)
 
     # parse data
     data = parse_data(args.filename)
@@ -48,3 +50,7 @@ if __name__ == '__main__':
     #         data={ "count" : row["count"] }
     #     )
     #     update_node(params)
+
+
+if __name__ == '__main__':
+    main()
