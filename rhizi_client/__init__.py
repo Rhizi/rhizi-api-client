@@ -136,18 +136,23 @@ class RhiziAPIClient(object):
         r = self.make_request("POST", 'rzdoc/search', {'search_query' : doc_name})
         return r
 
-    def node_create_one(self, rzdoc_name, name, id=str(random.getrandbits(32)), labels=["Type"]):
+    def node_create_one(self, rzdoc_name, name, node_id=None, labels=None):
         """Create a single node"""
 
+        if node_id is None:
+            node_id = str(random.getrandbits(32))
+        if labels is None:
+            labels = ["Type"]
+
         assert type(labels) is list
-        assert type(id) is str
+        assert type(node_id) is str
         assert type(name) is unicode
         assert type(rzdoc_name) is unicode
 
         # create node object
         node =  {}
         node["name"] = name
-        node["id"] = id
+        node["id"] = node_id
         node["__label_set"] = labels
 
         # parse JSON data

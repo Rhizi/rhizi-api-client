@@ -1,19 +1,141 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os, csv
+import os
 import argparse
+
+import yaml
+import pandas
+
 from rhizi_client import RhiziAPIClient, set_debugging
 
 
-def parse_data(filename):
+def parse_data(filename, header_unparsed):
     """Parse CSV data from file"""
-    with open(filename, 'rb') as f:
-        reader = csv.DictReader(f)
-        data = [row for row in reader]
+    if header_unparsed is None:
+        header = None
+    else:
+        header = [int(x.strip()) for x in header_unparsed.split(',')]
+    df = pandas.read_csv(filename, header=header)
 
-    print("Data: {} rows to export".format(len(data)))
-    return data
+    print("Data: {} rows to export".format(len(df)))
+    return df
+
+
+uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+assert len(uppercase) == 26
+
+
+def alphabet_to_index(al):
+    assert set(al) in set(uppercase)
+    ret = 0
+    for c in al:
+        ret = ret * 26 + ord(c) - ord('A')
+    return ret
+
+
+uppercase_and_plus = set(uppercase + '+')
+uppercase_and_minus = set(uppercase + '-')
+
+def tokens(s, sep=None):
+    return [x.strip() for x in s.split(sep)]
+
+def parse_node_rule(rule):
+    """
+    {'node': [{'type': 'person'},
+    {'name': 'B + A'},  ---or repeater--- {'name': 'Q-Z'}
+    {'work address': 'X + Y + Z + AA + AB'},
+    {'subtype-tags': 'Phd student 2015'}]}
+
+    We implement a slightly more general csv to graph language, wherein you can
+    sum columns from the same row as much as you want
+    """
+    attrs_factory = {}
+    for d in rule:
+        assert len(d) == 1
+        attrs_factory.update(d) # TODO: translate key names ('type' -> ??)
+
+    repeater = None
+    for k, v in attrs_factory.items():
+        # TODO: use a robust way instead of relying on upper case and + sign
+        s = set(v)
+
+        if s <= uppercase_and_plus and s >= {'+'}:
+            indices = [alphabet_to_index(x) for x in tokens(v) if x != '+']
+            def get_value(row, indices=indices):
+                return sum(row[i] for i in indices)
+            get_value.indices = indices
+            attrs_factory[k] = get_value
+
+        if s <= uppercase_and_minus and s >= {'-'}:
+            assert repeater is None
+            assert len([x for x in v if x == '-']) == 1
+            indices = [alphabet_to_index(x.strip()) for x in tokens(v, '-')]
+            assert len(indices) == 2
+            def gen_changed_attr(row, start=indices[0], end=indices[1] + 1, key=k):
+                for i in range(start, end):
+                    yield dict(key=row[i])
+            repeater = gen_changed_attr
+
+    # we assume all names are variably created
+    assert callable(attrs_factory['name']) and hasattr(attrs_factory['name'], 'indices')
+
+    def action_one(graph, api, rzdoc_name, row, more_attrs=None):
+        attrs = {k: v() if callable(v) else v for k, v in attrs_factory.items()}
+        if more_attrs is not None:
+            attrs.update(more_attrs)
+        node_id = graph.get_id()
+        sorted_name_indices = tuple(sorted(attrs_factory['name'].indices))
+        graph.record(node_id=node_id, sorted_name_indices=sorted_name_indices)
+        api.node_create_one(rzdoc_name=rzdoc_name,
+                            name=attrs['name'],
+                            node_id=node_id,
+                            labels=[attrs['type']]) # TODO - check this against existing graph
+        api.node_update_attr_single(rzdoc_name, attrs)
+
+    if repeater:
+        def action(graph, api, rzdoc_name, row):
+            for more_attrs in repeater(row):
+                action_one(graph=graph, api=api, rzdoc_name=rzdoc_name, row=row, more_attrs=more_attrs)
+    else:
+        action = action_one
+    return action
+
+
+def parse_edges_rules(rules):
+    ret = []
+    for rule in rules:
+        pass
+    return ret
+
+
+def parse_rules(filename):
+    with open(filename) as fd:
+        _rules = yaml.load(fd)
+    rules = []
+    for rule in _rules:
+        if 'node' in rule:
+            rules.append(parse_node_rule(rule['node']))
+        elif 'edges' in rule:
+            rules.extend(parse_edges_rules(rule['edges']))
+    return rules
+
+
+class GraphBuilder(object):
+
+    def __init__(self):
+        self.next_id = 0
+        self.name_ind_to_id = {} # (1, 2) -> 10
+
+    def get_id(self):
+        ret = self.next_id
+        self.next_id += 1
+        return ret
+
+    def record(node_id, sorted_name_indices):
+        assert sorted_name_indices not in self.name_ind_to_id
+        assert tuple(sorted(sorted_name_indices)) == sorted_name_indices
+        self.name_ind_to_id[sorted_name_indices] = node_id
 
 
 def main():
@@ -25,6 +147,8 @@ def main():
     parser.add_argument('--password', default=None, help='Password' )
     parser.add_argument('--rz-doc-name', default="Welcome to Rhizi", help='Name of the document to update' )
     parser.add_argument('--verbose', default=False, help='Show / hide logs' )
+    parser.add_argument('--rules', help='yaml file with rules to create graph from csv')
+    parser.add_argument('--header', help='list of columns to use for header rows')
 
     args = parser.parse_args()
 
@@ -37,13 +161,19 @@ def main():
 
     #check if the file exists
     if not os.path.isfile(args.filename):
-        raise ValueError("File '%s' doesn't exist"%args.filename)
+        raise ValueError("File '%s' doesn't exist" % args.filename)
 
     # parse data
-    data = parse_data(args.filename)
+    data = parse_data(args.filename, args.header)
 
+    rules = parse_rules(args.rules)
+
+    graph = GraphBuilder()
+
+    for row in data.itertuples():
     # update nodes
-    client.create_node(args.rz_doc_name, "Muttons")
+    nodes = []
+    client.(args.rz_doc_name, nodes=nodes)
 
     # for row in data :
     #     params = dict(
