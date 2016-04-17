@@ -97,10 +97,6 @@ def parse_node_rule(rule):
         # TODO: use a robust way instead of relying on upper case and + sign
         s = set(v) - {' '}
 
-        print("{}, <= U+ {}, > + {}, <= U- {}, > - {}".format(
-            s, s <= uppercase_and_plus, s >= {'+'},
-            s <= uppercase_and_minus, s >= {'-'}))
-
         if s <= uppercase_and_plus:
             indices = sum_expr_to_indices(v)
             if any(i > 26**2 for i in indices):
@@ -122,7 +118,6 @@ def parse_node_rule(rule):
             assert len(indices) == 2
             def gen_changed_attr(row, start=indices[0], end=indices[1] + 1, key=k):
                 for i in range(start, end):
-                    print("repeater: {}".format(i))
                     yield i, {key: row[i]}
             repeater = gen_changed_attr
             repeater_key = k
@@ -166,7 +161,6 @@ def parse_node_rule(rule):
     if repeater:
         def action(graph, api, rzdoc_name, row):
             for i, more_attrs in repeater(row):
-                print("got from repeater: {}, {}".format(i, more_attrs))
                 action_one(graph=graph, api=api, rzdoc_name=rzdoc_name, row=row,
                            name_indices=[i], more_attrs=more_attrs)
     else:
@@ -216,7 +210,7 @@ def parse_edges_rules(rules):
                             B_indices, u','.join(u"{}".format(row[i]) for i in B_indices)))
                         continue
                     api.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id,
-                                        nodeB_id=nodeB_id)
+                                        nodeB_id=nodeB_id, relationships=[label])
         action.rule = data
         ret.append(action)
     return ret

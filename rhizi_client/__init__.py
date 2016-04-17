@@ -184,8 +184,11 @@ class RhiziAPIClient(object):
     def node_delete(self, rzdoc_name, name):
         raise NotImplementedError
 
-    def edge_create_one(self, rzdoc_name, nodeA_id, nodeB_id, id=str(random.getrandbits(32)), relationships=[]):
+    def edge_create_one(self, rzdoc_name, nodeA_id, nodeB_id, id=str(random.getrandbits(32)), relationships=None):
         """Create an edge giving two existing nodes"""
+
+        if relationships == None or len(relationships) != 1:
+            raise Exception("must supply a single relationship, as supported currently by neo4j (in the way rhizi uses it)")
 
         # check params
         assert type(rzdoc_name) is unicode
