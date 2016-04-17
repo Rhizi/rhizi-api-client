@@ -17,7 +17,7 @@ def parse_data(filename, header_unparsed):
         header = None
     else:
         header = [int(x.strip()) for x in header_unparsed.split(',')]
-    df = pandas.read_csv(filename, header=header)
+    df = pandas.read_csv(filename, header=header, encoding='utf-8')
 
     print("Data: {} rows to export".format(len(df)))
     return df
@@ -31,27 +31,47 @@ def alphabet_to_index(al):
     assert set(al) <= set(uppercase)
     ret = 0
     for c in al:
-        ret = ret * 26 + ord(c) - ord('A')
-    return ret
+        ret = ret * 26 + (1 + ord(c) - ord('A'))
+    return ret - 1
 
 
 uppercase_and_plus = set(uppercase + '+')
 uppercase_and_minus = set(uppercase + '-')
+uppsercase_and_plusminus = set(uppercase + '+-')
 
-def tokens(s, sep=None):
-    return [x.strip() for x in s.split(sep)]
+
+def tokens(s, separators=None):
+    if separators is not None:
+        last = separators[-1]
+        for one in separators[:-1]:
+            s = s.replace(one, last)
+    else:
+        last = None
+    return [x.strip() for x in s.split(last)]
 
 
 def sum_expr_to_indices(expr):
-    return [alphabet_to_index(x) for x in tokens(expr) if x != '+']
+    return expr_to_indices(expr, '+')
+
+def expr_to_indices(expr, separators):
+    return [alphabet_to_index(x.strip()) for x in tokens(expr, separators)]
 
 
-class InvalidRule(Exception):
+class InvalidRuleApplication(Exception):
+    """
+    Could not apply rule to row
+
+    TODO: add row and rule as parameters to exception
+    """
+
+
+class OutofBoundsIndex(InvalidRuleApplication):
     pass
 
 
-class OutofBoundsIndex(InvalidRule):
+class ValueIsNan(InvalidRuleApplication):
     pass
+
 
 
 def parse_node_rule(rule):
@@ -71,6 +91,7 @@ def parse_node_rule(rule):
 
     repeater = None
     repeater_key = None
+    name_indices = None
     for k, v in attrs_factory.items():
         print("going over {}, {}".format(repr(k), repr(v)))
         # TODO: use a robust way instead of relying on upper case and + sign
@@ -87,8 +108,11 @@ def parse_node_rule(rule):
             def get_value(row, indices=indices):
                 if any(i > len(row) for i in indices):
                     raise OutofBoundsIndex("{}; {}".format(str(indices), len(row)))
-                return sum(row[i] for i in indices)
+                return u' '.join(unicode(row[i]) for i in indices)
             get_value.indices = indices
+            if k == 'name':
+                print("reading name indices {}".format(indices))
+                name_indices = indices
             attrs_factory[k] = get_value
 
         if s <= uppercase_and_minus and s >= {'-'}:
@@ -98,59 +122,102 @@ def parse_node_rule(rule):
             assert len(indices) == 2
             def gen_changed_attr(row, start=indices[0], end=indices[1] + 1, key=k):
                 for i in range(start, end):
-                    yield dict(key=row[i])
+                    print("repeater: {}".format(i))
+                    yield i, {key: row[i]}
             repeater = gen_changed_attr
             repeater_key = k
+            def just_to_store_the_indices(row, v=v):
+                return v
+            just_to_store_the_indices.indices = indices
+            attrs_factory[k] = just_to_store_the_indices
 
     # we assume all names are variably created or we are using a repeater for
     # name
     if repeater:
-        assert repeater_key is 'name' and not callable(attrs_factory['name'])
+        name_indices = None
+        assert repeater_key == 'name' and callable(attrs_factory['name'])
     else:
         assert callable(attrs_factory['name']) and hasattr(attrs_factory['name'], 'indices')
 
-    def action_one(graph, api, rzdoc_name, row, more_attrs=None):
+    def action_one(graph, api, rzdoc_name, row, name_indices=name_indices, more_attrs=None):
         attrs_pre = dict(attrs_factory)
         if more_attrs is not None:
-            attrs.update(more_attrs)
+            attrs_pre.update(more_attrs)
         # pass one - run callables
-        attrs = {k: v() if callable(v) else v for k, v in attrs_pre.items()}
+        attrs = {k: v(row) if callable(v) else v for k, v in attrs_pre.items()}
         # pass two - use formating
         for k, v in attrs.items():
-            attrs[k] = v.format(**attrs)
+            if unicode(v) == u'nan':
+                if k == 'name':
+                    print("skipping all node since name is nan") # TODO print more debugging/validation information - what rule produced this, which row index / complete row
+                    return
+                print("skipping key {} since it's value is nan".format(k))
+                continue
+            attrs[k] = unicode(v).format(**attrs)
         node_id = graph.get_id()
-        sorted_name_indices = tuple(sorted(attrs_factory['name'].indices))
+        sorted_name_indices = tuple(sorted(name_indices))
         graph.record(node_id=node_id, sorted_name_indices=sorted_name_indices)
         api.node_create_one(rzdoc_name=rzdoc_name,
                             name=attrs['name'],
                             node_id=node_id,
                             labels=[attrs['type']]) # TODO - check this against existing graph
-        api.node_update_attr_single(rzdoc_name, attrs)
+        api.node_update_attr_single(rzdoc_name=rzdoc_name, node_id=node_id, attrs=attrs)
 
     if repeater:
         def action(graph, api, rzdoc_name, row):
-            for more_attrs in repeater(row):
-                action_one(graph=graph, api=api, rzdoc_name=rzdoc_name, row=row, more_attrs=more_attrs)
+            for i, more_attrs in repeater(row):
+                print("got from repeater: {}, {}".format(i, more_attrs))
+                action_one(graph=graph, api=api, rzdoc_name=rzdoc_name, row=row,
+                           name_indices=[i], more_attrs=more_attrs)
     else:
         action = action_one
+    action.attrs_factory = attrs_factory
+    action.rule = rule
     return action
 
 
-edge_regexp = re.compile('^\[([A-Z+]*)\]\s*([^ \t]+)\s*\[([A-Z+]*)\]$')
+edge_regexp = re.compile('^\[([A-Z+-]*)\]\s*([^\[]+)\s*\[([A-Z+-]*)\]$')
+
+
+def edge_expr_to_index_list(expr):
+    if '-' in expr:
+        assert expr.count('-') == 1
+        assert '+' not in expr
+        assert set(expr) <= set(uppercase_and_minus)
+        start, end = expr_to_indices(expr, separators='-')
+        index_list = [(i,) for i in range(start, end + 1)]
+    else:
+        index_list = [expr_to_indices(expr, separators='+')]
+    return index_list
 
 
 def parse_edges_rules(rules):
     " [A+B] worked on [C] "
     ret = []
     for data in rules:
-        A_expr, label, B_expr = edge_regexp.match(data)
-        A_indices = sum_expr_to_indices(A_expr)
-        B_indices = sum_expr_to_indices(B_expr)
-        def action(graph, api, rzdoc_name, row, A_indices=A_indices, B_indices=B_indices, label=label):
-            nodeA_id = graph.id_from_indices(A_indices)
-            nodeB_id = graph.id_from_indices(B_indices)
-            api.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id,
-                                nodeB_id=nodeB_id)
+        A_expr, label, B_expr = edge_regexp.match(data).groups()
+        label = label.strip()
+        A_indices_list = edge_expr_to_index_list(A_expr)
+        B_indices_list = edge_expr_to_index_list(B_expr)
+        def action(graph, api, rzdoc_name, row,
+                   A_indices_list=A_indices_list,
+                   B_indices_list=B_indices_list,
+                   label=label):
+            for A_indices in A_indices_list:
+                nodeA_id = graph.id_from_indices(A_indices)
+                if nodeA_id is None:
+                    print(u"skipping edge, missing node based on {}, values {}".format(
+                        A_indices, u','.join(u"{}".format(row[i]) for i in A_indices)))
+                    continue
+                for B_indices in B_indices_list:
+                    nodeB_id = graph.id_from_indices(B_indices)
+                    if nodeB_id is None:
+                        print(u"skipping edge, missing node based on {}, values {}".format(
+                            B_indices, u','.join(u"{}".format(row[i]) for i in B_indices)))
+                        continue
+                    api.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id,
+                                        nodeB_id=nodeB_id)
+        action.rule = data
         ret.append(action)
     return ret
 
@@ -173,18 +240,21 @@ class GraphBuilder(object):
         self.next_id = 0
         self.name_ind_to_id = {} # (1, 2) -> 10
 
+    def new_row(self):
+        self.name_ind_to_id.clear()
+
     def get_id(self):
         ret = self.next_id
         self.next_id += 1
-        return ret
+        return str(ret)
 
-    def record(node_id, sorted_name_indices):
+    def record(self, node_id, sorted_name_indices):
         assert sorted_name_indices not in self.name_ind_to_id
         assert tuple(sorted(sorted_name_indices)) == sorted_name_indices
         self.name_ind_to_id[sorted_name_indices] = node_id
 
-    def id_from_indices(indices):
-        return self.node_ind_to_id[tuple(sorted(indices))]
+    def id_from_indices(self, indices):
+        return self.name_ind_to_id.get(tuple(sorted(indices)), None)
 
 
 def main():
@@ -194,10 +264,10 @@ def main():
     parser.add_argument('--base-url', default='http://localhost:8080', help='Base URL for the API')
     parser.add_argument('--user', default=None, help='Username')
     parser.add_argument('--password', default=None, help='Password' )
-    parser.add_argument('--rz-doc-name', default="Welcome to Rhizi", help='Name of the document to update' )
+    parser.add_argument('--rz-doc-name', type=unicode, default="Welcome to Rhizi", help='Name of the document to update' )
     parser.add_argument('--verbose', default=False, help='Show / hide logs' )
     parser.add_argument('--rules', help='yaml file with rules to create graph from csv')
-    parser.add_argument('--header', help='list of columns to use for header rows')
+    parser.add_argument('--header', help='list of columns to use for header rows', default='0,1')
 
     args = parser.parse_args()
 
@@ -219,8 +289,9 @@ def main():
 
     graph = GraphBuilder()
 
-    for row in data.itertuples():
-        for rule in rules:
+    for row_i, row in enumerate(data.itertuples()):
+        graph.new_row()
+        for r_i, rule in enumerate(rules):
             rule(graph=graph, api=client, rzdoc_name=args.rz_doc_name, row=row)
 
 
