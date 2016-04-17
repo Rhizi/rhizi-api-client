@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import re
 import os
 import argparse
 
@@ -27,7 +28,7 @@ assert len(uppercase) == 26
 
 
 def alphabet_to_index(al):
-    assert set(al) in set(uppercase)
+    assert set(al) <= set(uppercase)
     ret = 0
     for c in al:
         ret = ret * 26 + ord(c) - ord('A')
@@ -39,6 +40,19 @@ uppercase_and_minus = set(uppercase + '-')
 
 def tokens(s, sep=None):
     return [x.strip() for x in s.split(sep)]
+
+
+def sum_expr_to_indices(expr):
+    return [alphabet_to_index(x) for x in tokens(expr) if x != '+']
+
+
+class InvalidRule(Exception):
+    pass
+
+
+class OutofBoundsIndex(InvalidRule):
+    pass
+
 
 def parse_node_rule(rule):
     """
@@ -56,13 +70,23 @@ def parse_node_rule(rule):
         attrs_factory.update(d) # TODO: translate key names ('type' -> ??)
 
     repeater = None
+    repeater_key = None
     for k, v in attrs_factory.items():
+        print("going over {}, {}".format(repr(k), repr(v)))
         # TODO: use a robust way instead of relying on upper case and + sign
-        s = set(v)
+        s = set(v) - {' '}
 
-        if s <= uppercase_and_plus and s >= {'+'}:
-            indices = [alphabet_to_index(x) for x in tokens(v) if x != '+']
+        print("{}, <= U+ {}, > + {}, <= U- {}, > - {}".format(
+            s, s <= uppercase_and_plus, s >= {'+'},
+            s <= uppercase_and_minus, s >= {'-'}))
+
+        if s <= uppercase_and_plus:
+            indices = sum_expr_to_indices(v)
+            if any(i > 26**2 for i in indices):
+                print("suspect rule - index {} > {}".format(i, 26**2))
             def get_value(row, indices=indices):
+                if any(i > len(row) for i in indices):
+                    raise OutofBoundsIndex("{}; {}".format(str(indices), len(row)))
                 return sum(row[i] for i in indices)
             get_value.indices = indices
             attrs_factory[k] = get_value
@@ -76,14 +100,24 @@ def parse_node_rule(rule):
                 for i in range(start, end):
                     yield dict(key=row[i])
             repeater = gen_changed_attr
+            repeater_key = k
 
-    # we assume all names are variably created
-    assert callable(attrs_factory['name']) and hasattr(attrs_factory['name'], 'indices')
+    # we assume all names are variably created or we are using a repeater for
+    # name
+    if repeater:
+        assert repeater_key is 'name' and not callable(attrs_factory['name'])
+    else:
+        assert callable(attrs_factory['name']) and hasattr(attrs_factory['name'], 'indices')
 
     def action_one(graph, api, rzdoc_name, row, more_attrs=None):
-        attrs = {k: v() if callable(v) else v for k, v in attrs_factory.items()}
+        attrs_pre = dict(attrs_factory)
         if more_attrs is not None:
             attrs.update(more_attrs)
+        # pass one - run callables
+        attrs = {k: v() if callable(v) else v for k, v in attrs_pre.items()}
+        # pass two - use formating
+        for k, v in attrs.items():
+            attrs[k] = v.format(**attrs)
         node_id = graph.get_id()
         sorted_name_indices = tuple(sorted(attrs_factory['name'].indices))
         graph.record(node_id=node_id, sorted_name_indices=sorted_name_indices)
@@ -102,10 +136,22 @@ def parse_node_rule(rule):
     return action
 
 
+edge_regexp = re.compile('^\[([A-Z+]*)\]\s*([^ \t]+)\s*\[([A-Z+]*)\]$')
+
+
 def parse_edges_rules(rules):
+    " [A+B] worked on [C] "
     ret = []
-    for rule in rules:
-        pass
+    for data in rules:
+        A_expr, label, B_expr = edge_regexp.match(data)
+        A_indices = sum_expr_to_indices(A_expr)
+        B_indices = sum_expr_to_indices(B_expr)
+        def action(graph, api, rzdoc_name, row, A_indices=A_indices, B_indices=B_indices, label=label):
+            nodeA_id = graph.id_from_indices(A_indices)
+            nodeB_id = graph.id_from_indices(B_indices)
+            api.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id,
+                                nodeB_id=nodeB_id)
+        ret.append(action)
     return ret
 
 
@@ -136,6 +182,9 @@ class GraphBuilder(object):
         assert sorted_name_indices not in self.name_ind_to_id
         assert tuple(sorted(sorted_name_indices)) == sorted_name_indices
         self.name_ind_to_id[sorted_name_indices] = node_id
+
+    def id_from_indices(indices):
+        return self.node_ind_to_id[tuple(sorted(indices))]
 
 
 def main():
@@ -171,15 +220,8 @@ def main():
     graph = GraphBuilder()
 
     for row in data.itertuples():
-    # update nodes
-    nodes = []
-    client.(args.rz_doc_name, nodes=nodes)
-
-    # for row in data :
-    #     params = dict(
-    #         data={ "count" : row["count"] }
-    #     )
-    #     update_node(params)
+        for rule in rules:
+            rule(graph=graph, api=client, rzdoc_name=args.rz_doc_name, row=row)
 
 
 if __name__ == '__main__':
