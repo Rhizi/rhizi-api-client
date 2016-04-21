@@ -106,7 +106,6 @@ class RhiziAPIClient(object):
         r = self.make_request("POST", "login", data=payload)
         assert r.status_code == 200
         log.debug("sucessfully logged in with user : %s", email_address)
-        return r.json()
 
     def rz_doc_create(self, doc_name):
         """Create a new Rz-Doc"""
