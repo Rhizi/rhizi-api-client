@@ -59,3 +59,13 @@ docs/_build/
 
 # PyBuilder
 target/
+
+csv-test
+
+csv-test.numbers
+
+csv-test2.csv
+
+rules.crz
+
+rulestest
