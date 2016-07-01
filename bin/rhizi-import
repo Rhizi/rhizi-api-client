@@ -11,20 +11,53 @@ import pandas
 from rhizi_client import RhiziAPIClient, set_debugging
 
 
+verbose = False
+
+
+def verbose_print(s):
+    if verbose:
+        print(s)
+
+
 def parse_data(filename, header_unparsed):
     """Parse CSV data from file"""
     if header_unparsed is None:
         header = None
     else:
         header = [int(x.strip()) for x in header_unparsed.split(',')]
-    df = pandas.read_csv(filename, header=header, encoding='utf-8')
+    df = pandas.read_csv(filename, dtype=str, na_filter=False,
+                         header=header, encoding='utf-8')
 
-    print("Data: {} rows to export".format(len(df)))
+    verbose_print("Data: {} rows to export".format(len(df)))
     return df
 
 
 uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 assert len(uppercase) == 26
+
+
+def index_to_alphabet(ind):
+    """
+    A..Z - 1..26 - 0..25
+    A(A..Z) - 27..52 - 26..51
+    """
+    assert ind >= 1
+    ind -= 1
+    ret = []
+    while True:
+        rem = ind % 26
+        ret.append(chr(ord('A') + rem))
+        ind = (ind // 26) - 1
+        if ind < 0:
+            break
+    return ''.join(reversed(ret))
+
+
+def test_conversion():
+    for i in range(1, 1000):
+        al = index_to_alphabet(i)
+        i2 = alphabet_to_index(al)
+        assert(i == i2)
 
 
 def alphabet_to_index(al):
@@ -93,7 +126,7 @@ def parse_node_rule(rule):
     repeater_key = None
     name_indices = None
     for k, v in attrs_factory.items():
-        print("going over {}, {}".format(repr(k), repr(v)))
+        verbose_print("going over {}, {}".format(repr(k), repr(v)))
         # TODO: use a robust way instead of relying on upper case and + sign
         s = set(v) - {' '}
 
@@ -101,13 +134,17 @@ def parse_node_rule(rule):
             indices = sum_expr_to_indices(v)
             if any(i > 26**2 for i in indices):
                 print("suspect rule - index {} > {}".format(i, 26**2))
+
             def get_value(row, indices=indices):
                 if any(i > len(row) for i in indices):
                     raise OutofBoundsIndex("{}; {}".format(str(indices), len(row)))
-                return u' '.join(unicode(row[i]) for i in indices)
+                ret = u' '.join(unicode(row[i]) for i in indices if row[i] != '')
+                verbose_print("get_value: {}, {!r} => {}".format(row, indices, ret))
+                return ret
+
             get_value.indices = indices
             if k == 'name':
-                print("reading name indices {}".format(indices))
+                verbose_print("reading name indices {}".format(indices))
                 name_indices = indices
             attrs_factory[k] = get_value
 
@@ -139,12 +176,16 @@ def parse_node_rule(rule):
         if more_attrs is not None:
             attrs_pre.update(more_attrs)
         # pass one - run callables
-        attrs = {k: v(row) if callable(v) else v for k, v in attrs_pre.items()}
+        attrs = {}
+        for k, v in attrs_pre.items():
+            new_v = v(row) if callable(v) else v
+            verbose_print("pre: {} => {}".format(k, new_v))
+            attrs[k] = new_v
         # pass two - use formating
         for k, v in attrs.items():
             if unicode(v) == u'nan':
                 if k == 'name':
-                    print("skipping all node since name is nan") # TODO print more debugging/validation information - what rule produced this, which row index / complete row
+                    verbose_print("skipping all node since name is nan") # TODO print more debugging/validation information - what rule produced this, which row index / complete row
                     return
                 print("skipping key {} since it's value is nan".format(k))
                 continue
@@ -152,6 +193,7 @@ def parse_node_rule(rule):
         node_id = graph.get_id()
         sorted_name_indices = tuple(sorted(name_indices))
         graph.record(node_id=node_id, sorted_name_indices=sorted_name_indices)
+        print("{}: creating node id={} attrs={!r}".format(rzdoc_name, node_id, attrs))
         api.node_create_one(rzdoc_name=rzdoc_name,
                             name=attrs['name'],
                             node_id=node_id,
@@ -209,6 +251,8 @@ def parse_edges_rules(rules):
                         print(u"skipping edge, missing node based on {}, values {}".format(
                             B_indices, u','.join(u"{}".format(row[i]) for i in B_indices)))
                         continue
+                    print("{}: creating edge {} -[{}] -> {}".format(
+                        rzdoc_name, nodeA_id, label, nodeB_id))
                     api.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id,
                                         nodeB_id=nodeB_id, relationships=[label])
         action.rule = data
@@ -269,7 +313,8 @@ def main():
 
 
     # init Client API
-    print args.base_url
+    verbose = args.verbose
+    verbose_print(args.base_url)
     client = RhiziAPIClient(args.base_url, args.user, args.password, debug=args.verbose)
 
     #check if the file exists
