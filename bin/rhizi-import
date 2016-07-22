@@ -16,7 +16,7 @@ verbose = False
 
 def verbose_print(s):
     if verbose:
-        print(s)
+        debug_print(s)
 
 
 def parse_data(filename, header_unparsed):
@@ -133,7 +133,7 @@ def parse_node_rule(rule):
         if s <= uppercase_and_plus:
             indices = sum_expr_to_indices(v)
             if any(i > 26**2 for i in indices):
-                print("suspect rule - index {} > {}".format(i, 26**2))
+                debug_print("suspect rule - index {} > {}".format(i, 26**2))
 
             def get_value(row, indices=indices):
                 if any(i > len(row) for i in indices):
@@ -171,7 +171,7 @@ def parse_node_rule(rule):
     else:
         assert callable(attrs_factory['name']) and hasattr(attrs_factory['name'], 'indices')
 
-    def action_one(graph, api, rzdoc_name, row, name_indices=name_indices, more_attrs=None):
+    def action_one(graph, rzdoc_name, row, name_indices=name_indices, more_attrs=None):
         attrs_pre = dict(attrs_factory)
         if more_attrs is not None:
             attrs_pre.update(more_attrs)
@@ -187,23 +187,23 @@ def parse_node_rule(rule):
                 if k == 'name':
                     verbose_print("skipping all node since name is nan") # TODO print more debugging/validation information - what rule produced this, which row index / complete row
                     return
-                print("skipping key {} since it's value is nan".format(k))
+                debug_print("skipping key {} since it's value is nan".format(k))
                 continue
             attrs[k] = unicode(v).format(**attrs)
         node_id = graph.get_id()
         sorted_name_indices = tuple(sorted(name_indices))
         graph.record(node_id=node_id, sorted_name_indices=sorted_name_indices)
-        print("{}: creating node id={} attrs={!r}".format(rzdoc_name, node_id, attrs))
-        api.node_create_one(rzdoc_name=rzdoc_name,
+        debug_print("{}: creating node id={} attrs={!r}".format(rzdoc_name, node_id, attrs))
+        graph.node_create_one(rzdoc_name=rzdoc_name,
                             name=attrs['name'],
                             node_id=node_id,
                             labels=[attrs['type']]) # TODO - check this against existing graph
-        api.node_update_attr_single(rzdoc_name=rzdoc_name, node_id=node_id, attrs=attrs)
+        graph.node_update_attr_single(rzdoc_name=rzdoc_name, node_id=node_id, attrs=attrs)
 
     if repeater:
-        def action(graph, api, rzdoc_name, row):
+        def action(graph, rzdoc_name, row):
             for i, more_attrs in repeater(row):
-                action_one(graph=graph, api=api, rzdoc_name=rzdoc_name, row=row,
+                action_one(graph=graph, rzdoc_name=rzdoc_name, row=row,
                            name_indices=[i], more_attrs=more_attrs)
     else:
         action = action_one
@@ -227,6 +227,10 @@ def edge_expr_to_index_list(expr):
     return index_list
 
 
+def debug_print(s):
+    print('RZIMP: {}'.format(s))
+
+
 def parse_edges_rules(rules):
     " [A+B] worked on [C] "
     ret = []
@@ -235,25 +239,25 @@ def parse_edges_rules(rules):
         label = label.strip()
         A_indices_list = edge_expr_to_index_list(A_expr)
         B_indices_list = edge_expr_to_index_list(B_expr)
-        def action(graph, api, rzdoc_name, row,
+        def action(graph, rzdoc_name, row,
                    A_indices_list=A_indices_list,
                    B_indices_list=B_indices_list,
                    label=label):
             for A_indices in A_indices_list:
                 nodeA_id = graph.id_from_indices(A_indices)
                 if nodeA_id is None:
-                    print(u"skipping edge, missing node based on {}, values {}".format(
+                    debug_print(u"skipping edge, missing node based on {}, values {}".format(
                         A_indices, u','.join(u"{}".format(row[i]) for i in A_indices)))
                     continue
                 for B_indices in B_indices_list:
                     nodeB_id = graph.id_from_indices(B_indices)
                     if nodeB_id is None:
-                        print(u"skipping edge, missing node based on {}, values {}".format(
+                        debug_print(u"skipping edge, missing node based on {}, values {}".format(
                             B_indices, u','.join(u"{}".format(row[i]) for i in B_indices)))
                         continue
-                    print("{}: creating edge {} -[{}] -> {}".format(
+                    debug_print("{}: creating edge {} -[{}] -> {}".format(
                         rzdoc_name, nodeA_id, label, nodeB_id))
-                    api.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id,
+                    graph.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id,
                                         nodeB_id=nodeB_id, relationships=[label])
         action.rule = data
         ret.append(action)
@@ -274,9 +278,11 @@ def parse_rules(filename):
 
 class GraphBuilder(object):
 
-    def __init__(self):
+    def __init__(self, api):
         self.next_id = 0
         self.name_ind_to_id = {} # (1, 2) -> 10
+        self.node_id_to_name = {}
+        self.api = api
 
     def new_row(self):
         self.name_ind_to_id.clear()
@@ -291,11 +297,30 @@ class GraphBuilder(object):
         assert tuple(sorted(sorted_name_indices)) == sorted_name_indices
         self.name_ind_to_id[sorted_name_indices] = node_id
 
+    def edge_create_one(self, rzdoc_name, nodeA_id, nodeB_id, relationships):
+        if self.node_id_to_name[nodeA_id] == '':
+            verbose_print('skipping edge because nodeA_id = {} name is empty'.format(nodeA_id))
+            return
+        if self.node_id_to_name[nodeB_id] == '':
+            verbose_print('skipping edge because nodeB_id = {} name is empty'.format(nodeB_id))
+            return
+        self.api.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id, nodeB_id=nodeB_id, relationships=relationships)
+
+    def node_create_one(self, rzdoc_name, name, node_id, labels):
+        self.node_id_to_name[node_id] = name
+        self.api.node_create_one(rzdoc_name=rzdoc_name, name=name, node_id=node_id,
+                                 labels=labels) # TODO - check this against existing graph
+
+    def node_update_attr_single(self, rzdoc_name, node_id, attrs):
+        self.api.node_update_attr_single(rzdoc_name=rzdoc_name, node_id=node_id, attrs=attrs)
+
     def id_from_indices(self, indices):
         return self.name_ind_to_id.get(tuple(sorted(indices)), None)
 
 
 def main():
+    global verbose
+
     # cli parser
     parser = argparse.ArgumentParser(description='Rhizi Importer with simples options')
     parser.add_argument('filename', action="store", default=None, help='CSV file path' )
@@ -326,12 +351,12 @@ def main():
 
     rules = parse_rules(args.rules)
 
-    graph = GraphBuilder()
+    graph = GraphBuilder(client)
 
     for row_i, row in enumerate(data.itertuples()):
         graph.new_row()
         for r_i, rule in enumerate(rules):
-            rule(graph=graph, api=client, rzdoc_name=args.rz_doc_name, row=row)
+            rule(graph=graph, rzdoc_name=args.rz_doc_name, row=row)
 
 
 if __name__ == '__main__':
