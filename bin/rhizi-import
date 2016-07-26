@@ -19,12 +19,10 @@ def verbose_print(s):
         debug_print(s)
 
 
-def parse_data(filename, header_unparsed):
+def parse_data(filename, header=None):
     """Parse CSV data from file"""
-    if header_unparsed is None:
-        header = None
-    else:
-        header = [int(x.strip()) for x in header_unparsed.split(',')]
+    if header is None:
+        header = [0, 1]
     df = pandas.read_csv(filename, dtype=str, na_filter=False,
                          header=header, encoding='utf-8')
 
@@ -347,7 +345,8 @@ def main():
         raise ValueError("File '%s' doesn't exist" % args.filename)
 
     # parse data
-    data = parse_data(args.filename, args.header)
+    header = [int(x.strip()) for x in args.header.split(',')]
+    data = parse_data(args.filename, header)
 
     rules = parse_rules(args.rules)
 
