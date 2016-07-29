@@ -156,12 +156,12 @@ def parse_node_rule(rule):
                 name_indices = indices
             attrs_factory[k] = get_value
 
-        if s <= uppercase_and_minus and s >= {'-'}:
+        elif s <= uppercase_and_minus and s >= {'-'}:
             assert repeater is None
             assert len([x for x in v if x == '-']) == 1
             indices = [alphabet_to_index(x.strip()) for x in tokens(v, '-')]
             assert len(indices) == 2
-            def gen_changed_attr(row, start=indices[0], end=indices[1] + 1, key=k):
+            def gen_changed_attr(row, df, start=indices[0], end=indices[1] + 1, key=k):
                 for i in range(start, end):
                     yield i, {key: row[i]}
             repeater = gen_changed_attr
@@ -179,7 +179,7 @@ def parse_node_rule(rule):
     else:
         assert callable(attrs_factory['name']) and hasattr(attrs_factory['name'], 'indices')
 
-    def action_one(graph, rzdoc_name, row, name_indices=name_indices, more_attrs=None):
+    def action_one(graph, rzdoc_name, row, df, name_indices=name_indices, more_attrs=None):
         attrs_pre = dict(attrs_factory)
         if more_attrs is not None:
             attrs_pre.update(more_attrs)
@@ -209,9 +209,9 @@ def parse_node_rule(rule):
         graph.node_update_attr_single(rzdoc_name=rzdoc_name, node_id=node_id, attrs=attrs)
 
     if repeater:
-        def action(graph, rzdoc_name, row):
-            for i, more_attrs in repeater(row):
-                action_one(graph=graph, rzdoc_name=rzdoc_name, row=row,
+        def action(graph, rzdoc_name, row, df):
+            for i, more_attrs in repeater(row=row, df=df):
+                action_one(graph=graph, df=df, rzdoc_name=rzdoc_name, row=row,
                            name_indices=[i], more_attrs=more_attrs)
     else:
         action = action_one
@@ -247,7 +247,7 @@ def parse_edges_rules(rules):
         label = label.strip()
         A_indices_list = edge_expr_to_index_list(A_expr)
         B_indices_list = edge_expr_to_index_list(B_expr)
-        def action(graph, rzdoc_name, row,
+        def action(graph, rzdoc_name, row, df,
                    A_indices_list=A_indices_list,
                    B_indices_list=B_indices_list,
                    label=label):
@@ -263,7 +263,7 @@ def parse_edges_rules(rules):
                         debug_print(u"skipping edge, missing node based on {}, values {}".format(
                             B_indices, u','.join(u"{}".format(row[i]) for i in B_indices)))
                         continue
-                    debug_print("{}: creating edge {} -[{}] -> {}".format(
+                    debug_print("{}: creating edge {} -- [{}] --> {}".format(
                         rzdoc_name, nodeA_id, label, nodeB_id))
                     graph.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id,
                                         nodeB_id=nodeB_id, relationships=[label])
@@ -365,7 +365,7 @@ def main():
     for row_i, row in enumerate(data.itertuples()):
         graph.new_row()
         for r_i, rule in enumerate(rules):
-            rule(graph=graph, rzdoc_name=args.rz_doc_name, row=row)
+            rule(graph=graph, rzdoc_name=args.rz_doc_name, df=data, row=row)
 
 
 if __name__ == '__main__':
