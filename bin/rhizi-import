@@ -171,6 +171,19 @@ def parse_node_rule(rule):
             just_to_store_the_indices.indices = indices
             attrs_factory[k] = just_to_store_the_indices
 
+        elif k == 'name':
+            # must be a field added via preprocess, store it as such
+            def preprocessed_split_row_lookup(row, df, split_key=v, key=k):
+                orig_col = df.col_to_index[split_key]
+                for i, v in enumerate(row[orig_col]):
+                    yield (orig_col, i), {key: v}
+            repeater = preprocessed_split_row_lookup
+            repeater_key = k
+            def just_to_store_the_indices(row, v=v):
+                return v
+            just_to_store_the_indices.indices = v
+            attrs_factory[k] = just_to_store_the_indices
+
     # we assume all names are variably created or we are using a repeater for
     # name
     if repeater:
