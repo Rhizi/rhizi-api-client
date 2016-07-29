@@ -213,13 +213,12 @@ def parse_node_rule(rule):
             attrs[k] = unicode(v).format(**attrs)
         node_id = graph.get_id()
         sorted_name_indices = tuple(sorted(name_indices))
-        graph.record(node_id=node_id, sorted_name_indices=sorted_name_indices)
-        debug_print("{}: creating node id={} attrs={!r}".format(rzdoc_name, node_id, attrs))
         graph.node_create_one(rzdoc_name=rzdoc_name,
-                            name=attrs['name'],
-                            node_id=node_id,
-                            labels=[attrs['type']]) # TODO - check this against existing graph
-        graph.node_update_attr_single(rzdoc_name=rzdoc_name, node_id=node_id, attrs=attrs)
+                              name=attrs['name'],
+                              node_id=node_id,
+                              labels=[attrs['type']],
+                              sorted_name_indices=sorted_name_indices,
+                              attrs=attrs) # TODO - check this against existing graph
 
     if repeater:
         def action(graph, rzdoc_name, row, df):
@@ -384,7 +383,7 @@ class GraphBuilder(object):
         self.next_id += 1
         return str(ret)
 
-    def record(self, node_id, sorted_name_indices):
+    def _record(self, node_id, sorted_name_indices):
         assert sorted_name_indices not in self.name_ind_to_id
         assert tuple(sorted(sorted_name_indices)) == sorted_name_indices
         self.name_ind_to_id[sorted_name_indices] = node_id
@@ -398,12 +397,15 @@ class GraphBuilder(object):
             return
         self.api.edge_create_one(rzdoc_name=rzdoc_name, nodeA_id=nodeA_id, nodeB_id=nodeB_id, relationships=relationships)
 
-    def node_create_one(self, rzdoc_name, name, node_id, labels):
+    def node_create_one(self, rzdoc_name, name, node_id, labels, sorted_name_indices, attrs):
+        if len(name.strip()) == 0:
+            print("not creating a zero length name node (sorted_name_indices = {}, attrs = {})".format(sorted_name_indices, attrs))
+            return
+        debug_print("{}: creating node id={} attrs={!r}".format(rzdoc_name, node_id, attrs))
+        self._record(node_id=node_id, sorted_name_indices=sorted_name_indices)
         self.node_id_to_name[node_id] = name
         self.api.node_create_one(rzdoc_name=rzdoc_name, name=name, node_id=node_id,
                                  labels=labels) # TODO - check this against existing graph
-
-    def node_update_attr_single(self, rzdoc_name, node_id, attrs):
         self.api.node_update_attr_single(rzdoc_name=rzdoc_name, node_id=node_id, attrs=attrs)
 
     def id_from_indices(self, indices):
