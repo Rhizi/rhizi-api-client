@@ -356,6 +356,8 @@ def main():
 
     # parse data
     header = [int(x.strip()) for x in args.header.split(',')]
+    if len(header) == 1:
+        header = header[0]
     data = parse_data(args.filename, header)
 
     rules = parse_rules(args.rules)
