@@ -220,19 +220,54 @@ def parse_node_rule(rule):
     return action
 
 
-edge_regexp = re.compile('^\[([A-Z+-]*)\]\s*([^\[]+)\s*\[([A-Z+-]*)\]$')
+edge_regexp = re.compile('^\[([A-Z+-]*)\]\s*([^\[]+)\s*\[([A-Za-z+-]*)\]$')
+
+
+class RowLocation(object):
+    pass
+
+
+class RowIndices(RowLocation):
+    """
+    Represents a collection of subsets of whole columns
+    """
+    def __init__(self, indices):
+        self.indices = indices
+
+    def __call__(self, df, row):
+        return iter(self.indices)
+
+
+class RowStar(RowLocation):
+    """
+    Represents a collection of subsets of a single column,
+    generally a column containing a list.
+    """
+    def __init__(self, col_name):
+        self.col_name = col_name
+
+    def __call__(self, df, row):
+        col_index = df.col_to_index[self.col_name]
+        val = row[col_index]
+        return [((col_index, i),) for i in range(len(val))]
 
 
 def edge_expr_to_index_list(expr):
-    if '-' in expr:
+    # HACK: should have AST at this point. Instead we parse and give meaning
+    # in the same place (language, language).
+    if expr.upper() != expr: # has lower case => is a preprocess created name
+        ret = RowStar(expr)
+    elif '-' in expr:
         assert expr.count('-') == 1
         assert '+' not in expr
         assert set(expr) <= set(uppercase_and_minus)
         start, end = expr_to_indices(expr, separators='-')
         index_list = [(i,) for i in range(start, end + 1)]
+        ret = RowIndices(index_list)
     else:
         index_list = [expr_to_indices(expr, separators='+')]
-    return index_list
+        ret = RowIndices(index_list)
+    return ret
 
 
 def debug_print(s):
@@ -251,13 +286,13 @@ def parse_edges_rules(rules):
                    A_indices_list=A_indices_list,
                    B_indices_list=B_indices_list,
                    label=label):
-            for A_indices in A_indices_list:
+            for A_indices in A_indices_list(df=df, row=row):
                 nodeA_id = graph.id_from_indices(A_indices)
                 if nodeA_id is None:
                     debug_print(u"skipping edge, missing node based on {}, values {}".format(
                         A_indices, u','.join(u"{}".format(row[i]) for i in A_indices)))
                     continue
-                for B_indices in B_indices_list:
+                for B_indices in B_indices_list(df=df, row=row):
                     nodeB_id = graph.id_from_indices(B_indices)
                     if nodeB_id is None:
                         debug_print(u"skipping edge, missing node based on {}, values {}".format(
