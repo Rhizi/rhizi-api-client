@@ -183,8 +183,11 @@ class RhiziAPIClient(object):
     def node_delete(self, rzdoc_name, name):
         raise NotImplementedError
 
-    def edge_create_one(self, rzdoc_name, nodeA_id, nodeB_id, id=str(random.getrandbits(32)), relationships=None):
+    def edge_create_one(self, rzdoc_name, nodeA_id, nodeB_id, edge_id=None, relationships=None):
         """Create an edge giving two existing nodes"""
+
+        if edge_id is None:
+            edge_id = str(random.getrandbits(32))
 
         if relationships == None or len(relationships) != 1:
             raise Exception("must supply a single relationship, as supported currently by neo4j (in the way rhizi uses it)")
@@ -197,9 +200,9 @@ class RhiziAPIClient(object):
 
         # make link
         link = {}
-        link["id"] = id
-        link["__dst_id"] = nodeA_id
-        link["__src_id"] = nodeB_id
+        link["id"] = edge_id
+        link["__src_id"] = nodeA_id
+        link["__dst_id"] = nodeB_id
         link["__type"] = relationships
 
         # payload
