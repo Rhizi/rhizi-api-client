@@ -320,16 +320,52 @@ def parse_edges_rules(rules):
     return ret
 
 
+class PreprocessRule(object):
+    def __init__(self, source, target):
+        self.source = source
+        self.target = target
+
+    def action(self, df):
+        source_index = alphabet_to_index(self.source) - 1
+        col_num = len(df.columns)
+        df[self.target] = [[s.strip() for s in x.split(',')] for x in df.iloc[:, source_index]]
+        assert df.columns[col_num] == self.target or self.target in df.columns[col_num] # no idea how to get the index directly, so assert that it behaves as we expect
+        if not hasattr(df, 'col_to_index'):
+            df.col_to_index = {}
+        df.col_to_index[self.target] = col_num + 1 # index is col 0, the rest are based on 0
+        return df
+
+
+def parse_preprocess_rule(yaml):
+    d = array_of_kv_dicts_to_dict(yaml)
+    # only support a single action: split to create a new field
+    assert 'target' in d
+    assert 'source' in d
+    assert d['action'] == 'split'
+    assert d['params'] == 'comma'
+    rule = PreprocessRule(source=d['source'], target=d['target'])
+    return rule
+
+
+def preprocess(data, rules):
+    for rule in rules:
+        data = rule.action(data)
+    return data
+
+
 def parse_rules(filename):
     with open(filename) as fd:
         _rules = yaml.load(fd)
     rules = []
+    prerules = []
     for rule in _rules:
         if 'node' in rule:
             rules.append(parse_node_rule(rule['node']))
         elif 'edges' in rule:
             rules.extend(parse_edges_rules(rule['edges']))
-    return rules
+        elif 'preprocess' in rule:
+            prerules.append(parse_preprocess_rule(rule['preprocess']))
+    return lambda data: preprocess(data, prerules), rules
 
 
 class GraphBuilder(object):
@@ -408,7 +444,9 @@ def main():
         header = header[0]
     data = parse_data(args.filename, header)
 
-    rules = parse_rules(args.rules)
+    preprocess, rules = parse_rules(args.rules)
+
+    data = preprocess(data)
 
     graph = GraphBuilder(client)
 
