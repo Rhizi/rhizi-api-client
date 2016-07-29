@@ -11,6 +11,12 @@ import pandas
 from rhizi_client import RhiziAPIClient, set_debugging
 
 
+try:
+    unicode
+except:
+    unicode = str
+
+
 verbose = False
 
 
