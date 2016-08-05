@@ -294,11 +294,19 @@ def take(arr, indices_or_index):
     return [arr[i] for i in it]
 
 
+def fatal(msg):
+    print("FATAL: {}".format(msg))
+    sys.exit(-1)
+
+
 def parse_edges_rules(rules):
     " [A+B] worked on [C] "
     ret = []
     for data in rules:
-        A_expr, label, B_expr = edge_regexp.match(data).groups()
+        result = edge_regexp.match(data)
+        if result is None:
+            fatal("edge rule {!r} does not match expected form [A+B] blabla [C]".format(data))
+        A_expr, label, B_expr = result.groups()
         label = label.strip()
         A_indices_list = edge_expr_to_index_list(A_expr)
         B_indices_list = edge_expr_to_index_list(B_expr)
