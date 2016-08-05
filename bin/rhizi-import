@@ -336,14 +336,15 @@ def parse_edges_rules(rules):
 
 
 class PreprocessRule(object):
-    def __init__(self, source, target):
+    def __init__(self, source, target, separator):
         self.source = source
         self.target = target
+        self.separator = separator
 
     def action(self, df):
         source_index = alphabet_to_index(self.source) - 1
         col_num = len(df.columns)
-        df[self.target] = [[s.strip() for s in x.split(',')] for x in df.iloc[:, source_index]]
+        df[self.target] = [[s.strip() for s in x.split(self.separator)] for x in df.iloc[:, source_index]]
         assert df.columns[col_num] == self.target or self.target in df.columns[col_num] # no idea how to get the index directly, so assert that it behaves as we expect
         if not hasattr(df, 'col_to_index'):
             df.col_to_index = {}
@@ -357,8 +358,9 @@ def parse_preprocess_rule(yaml):
     assert 'target' in d
     assert 'source' in d
     assert d['action'] == 'split'
-    assert d['params'] == 'comma'
-    rule = PreprocessRule(source=d['source'], target=d['target'])
+    assert d['params'] in ['comma', 'semicolon', 'semi-colon']
+    separator = ',' if d['params'] == 'comma' else ';'
+    rule = PreprocessRule(source=d['source'], target=d['target'], separator=separator)
     return rule
 
 
