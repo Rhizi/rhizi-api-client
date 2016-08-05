@@ -147,7 +147,7 @@ def parse_node_rule(rule):
                 if any(i > len(row) for i in indices):
                     raise OutofBoundsIndex("{}; {}".format(str(indices), len(row)))
                 ret = u' '.join(unicode(row[i]) for i in indices if row[i] != '')
-                verbose_print("get_value: {}, {!r} => {}".format(row, indices, ret))
+                verbose_print(u"get_value: {}, {!r} => {}".format(row, indices, ret))
                 return ret
 
             get_value.indices = indices
@@ -200,7 +200,7 @@ def parse_node_rule(rule):
         attrs = {}
         for k, v in attrs_pre.items():
             new_v = v(row) if callable(v) else v
-            verbose_print("pre: {} => {}".format(k, new_v))
+            verbose_print(u"pre: {} => {}".format(k, new_v))
             attrs[k] = new_v
         # pass two - use formating
         for k, v in attrs.items():
@@ -286,6 +286,14 @@ def debug_print(s):
     print('RZIMP: {}'.format(s))
 
 
+def take(arr, indices_or_index):
+    try:
+        it = iter(indices_or_index)
+    except TypeError:
+        return arr[indices_or_index]
+    return [arr[i] for i in it]
+
+
 def parse_edges_rules(rules):
     " [A+B] worked on [C] "
     ret = []
@@ -308,7 +316,7 @@ def parse_edges_rules(rules):
                     nodeB_id = graph.id_from_indices(B_indices)
                     if nodeB_id is None:
                         debug_print(u"skipping edge, missing node based on {}, values {}".format(
-                            B_indices, u','.join(u"{}".format(row[i]) for i in B_indices)))
+                            B_indices, u','.join(u"{!r}".format(take(row, i)) for i in B_indices)))
                         continue
                     debug_print("{}: creating edge {} -- [{}] --> {}".format(
                         rzdoc_name, nodeA_id, label, nodeB_id))
