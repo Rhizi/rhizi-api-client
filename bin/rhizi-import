@@ -233,7 +233,7 @@ def parse_node_rule(rule):
     return action
 
 
-edge_regexp = re.compile('^\[([A-Z+-]*)\]\s*([^\[]+)\s*\[([A-Za-z+-]*)\]$')
+edge_regexp = re.compile('^\[([A-Za-z+-]*)\]\s*([^\[]+)\s*\[([A-Za-z+-]*)\]$')
 
 
 class RowLocation(object):
@@ -318,13 +318,13 @@ def parse_edges_rules(rules):
             for A_indices in A_indices_list(df=df, row=row):
                 nodeA_id = graph.id_from_indices(A_indices)
                 if nodeA_id is None:
-                    debug_print(u"skipping edge, missing node based on {}, values {}".format(
-                        A_indices, u','.join(u"{}".format(row[i]) for i in A_indices)))
+                    debug_print(u"skipping edge, missing node based on {}, values {!r}".format(
+                        A_indices, u','.join(u"{}".format(take(row, i)) for i in A_indices)))
                     continue
                 for B_indices in B_indices_list(df=df, row=row):
                     nodeB_id = graph.id_from_indices(B_indices)
                     if nodeB_id is None:
-                        debug_print(u"skipping edge, missing node based on {}, values {}".format(
+                        debug_print(u"skipping edge, missing node based on {}, values {!r}".format(
                             B_indices, u','.join(u"{!r}".format(take(row, i)) for i in B_indices)))
                         continue
                     debug_print("{}: creating edge {} -- [{}] --> {}".format(
