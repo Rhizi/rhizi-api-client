@@ -392,6 +392,7 @@ class GraphBuilder(object):
         self.next_id = 0
         self.name_ind_to_id = {} # (1, 2) -> 10
         self.node_id_to_name = {}
+        self.node_name_to_id = {}
         self.api = api
 
     def new_row(self):
@@ -420,11 +421,18 @@ class GraphBuilder(object):
         if len(name.strip()) == 0:
             print("not creating a zero length name node (sorted_name_indices = {}, attrs = {})".format(sorted_name_indices, attrs))
             return
-        debug_print("{}: creating node id={} attrs={!r}".format(rzdoc_name, node_id, attrs))
-        self._record(node_id=node_id, sorted_name_indices=sorted_name_indices)
-        self.node_id_to_name[node_id] = name
-        self.api.node_create_one(rzdoc_name=rzdoc_name, name=name, node_id=node_id,
-                                 labels=labels) # TODO - check this against existing graph
+        # check for uniqueness, reuse existing ones
+        create_new = name not in self.node_name_to_id
+        if not create_new:
+            node_id = self.node_name_to_id[name]
+            debug_print(u"{}: reusing node_id {} for name {}".format(rzdoc_name, node_id, name))
+        else:
+            self.node_name_to_id[name] = node_id
+            debug_print(u"{}: creating node id={} attrs={!r}".format(rzdoc_name, node_id, attrs))
+            self.node_id_to_name[node_id] = name
+            self._record(node_id=node_id, sorted_name_indices=sorted_name_indices)
+            self.api.node_create_one(rzdoc_name=rzdoc_name, name=name, node_id=node_id,
+                                    labels=labels) # TODO - check this against existing graph
         self.api.node_update_attr_single(rzdoc_name=rzdoc_name, node_id=node_id, attrs=attrs)
 
     def id_from_indices(self, indices):
